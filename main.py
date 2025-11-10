@@ -56,9 +56,9 @@ app.layout = html.Div([
         ], style={'width': '48%', 'display': 'inline-block', 'marginBottom': '20px'}),
         
         html.Div([
-            html.Label("P(~L|~Y) (Probability of not L given not Y):", style={'fontWeight': 'bold'}),
+            html.Label("P(L̄|Ȳ) (Probability of not L given not Y):", style={'fontWeight': 'bold'}),
             dcc.Slider(
-                id='p-not-l-given-not-y-slider',
+                id='p-l-bar-given-y-bar-slider',
                 min=0.0,
                 max=1.0,
                 step=0.01,
@@ -90,23 +90,23 @@ app.layout = html.Div([
                 html.Li("s: Strength parameter affecting the learning dynamics"),
                 html.Li("P(L|Y): Probability of literal response given Y is true"),
                 html.Li("P(Y): Base probability that Y is true"),
-                html.Li("P(~L|~Y): Probability of not giving literal response when Y is false"),
-                html.Li("P(~L|Y) = 1 - P(L|Y): Automatically calculated"),
-                html.Li("P(~Y) = 1 - P(Y): Automatically calculated")
+                html.Li("P(L̄|Ȳ): Probability of not giving literal response when Y is false"),
+                html.Li("P(L̄|Y) = 1 - P(L|Y): Automatically calculated"),
+                html.Li("P(Ȳ) = 1 - P(Y): Automatically calculated")
             ])
         ])
     ], style={'marginTop': '30px', 'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'})
 ])
 
-def calculate_stationary_distribution(s, p_l_given_y, p_y, p_not_l_given_not_y):
+def calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     """
     Calculate the stationary distribution for the 8-state Literal Automaton
     States: (Y, L, Y_prev) where each can be 0 or 1
     """
     # Derived probabilities
-    p_not_l_given_y = 1 - p_l_given_y
-    p_not_y = 1 - p_y
-    p_l_given_not_y = 1 - p_not_l_given_not_y
+    p_l_bar_given_y = 1 - p_l_given_y
+    p_y_bar = 1 - p_y
+    p_l_given_y_bar = 1 - p_l_bar_given_y_bar
     
     # Create transition matrix (8x8)
     # States are ordered as: (0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)
@@ -140,19 +140,19 @@ def calculate_stationary_distribution(s, p_l_given_y, p_y, p_not_l_given_not_y):
             if y_next == 1:
                 prob_y_next = p_y
             else:
-                prob_y_next = p_not_y
+                prob_y_next = p_y_bar
             
             # Probability of L_next given Y_next
             if l_next == 1:
                 if y_next == 1:
                     prob_l_next = p_l_given_y
                 else:
-                    prob_l_next = p_l_given_not_y
+                    prob_l_next = p_l_given_y_bar
             else:
                 if y_next == 1:
-                    prob_l_next = p_not_l_given_y
+                    prob_l_next = p_l_bar_given_y
                 else:
-                    prob_l_next = p_not_l_given_not_y
+                    prob_l_next = p_l_bar_given_y_bar
             
             # Apply strength parameter (learning effect)
             strength_factor = np.exp(s * (l_curr if y_curr == 1 else (1-l_curr)))
@@ -180,16 +180,16 @@ def calculate_stationary_distribution(s, p_l_given_y, p_y, p_not_l_given_not_y):
     [Input('s-slider', 'value'),
      Input('p-l-given-y-slider', 'value'),
      Input('p-y-slider', 'value'),
-     Input('p-not-l-given-not-y-slider', 'value')]
+     Input('p-l-bar-given-y-bar-slider', 'value')]
 )
-def update_chart(s, p_l_given_y, p_y, p_not_l_given_not_y):
+def update_chart(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     # Calculate derived parameters
-    p_not_l_given_y = 1 - p_l_given_y
-    p_not_y = 1 - p_y
-    p_l_given_not_y = 1 - p_not_l_given_not_y
+    p_l_bar_given_y = 1 - p_l_given_y
+    p_y_bar = 1 - p_y
+    p_l_given_y_bar = 1 - p_l_bar_given_y_bar
     
     # Calculate stationary distribution
-    stationary_dist = calculate_stationary_distribution(s, p_l_given_y, p_y, p_not_l_given_not_y)
+    stationary_dist = calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar)
     
     # Create state labels
     state_labels = [
@@ -232,9 +232,9 @@ def update_chart(s, p_l_given_y, p_y, p_not_l_given_not_y):
     
     # Update derived parameters display
     derived_params = html.Div([
-        html.P(f"P(~L|Y) = 1 - P(L|Y) = {p_not_l_given_y:.3f}"),
-        html.P(f"P(~Y) = 1 - P(Y) = {p_not_y:.3f}"),
-        html.P(f"P(L|~Y) = 1 - P(~L|~Y) = {p_l_given_not_y:.3f}")
+        html.P(f"P(L̄|Y) = 1 - P(L|Y) = {p_l_bar_given_y:.3f}"),
+        html.P(f"P(Ȳ) = 1 - P(Y) = {p_y_bar:.3f}"),
+        html.P(f"P(L|Ȳ) = 1 - P(L̄|Ȳ) = {p_l_given_y_bar:.3f}")
     ])
     
     return fig, derived_params
