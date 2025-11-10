@@ -49,7 +49,7 @@ app.layout = html.Div([
                 min=0.0,
                 max=1.0,
                 step=0.01,
-                value=0.6,
+                value=0.79,  # Updated to match image
                 marks={i/10: str(i/10) for i in range(0, 11, 2)},
                 tooltip={"placement": "bottom", "always_visible": True}
             )
@@ -62,7 +62,7 @@ app.layout = html.Div([
                 min=0.0,
                 max=1.0,
                 step=0.01,
-                value=0.7,
+                value=0.22,  # Updated so P(L|not Y) = 0.78
                 marks={i/10: str(i/10) for i in range(0, 11, 2)},
                 tooltip={"placement": "bottom", "always_visible": True}
             )
@@ -80,19 +80,25 @@ app.layout = html.Div([
     html.Div([
         html.H3("Model Description:", style={'marginTop': '30px'}),
         html.P([
-            "This visualization shows the stationary distribution of a Literal Automaton with 8 states. "
-            "The eight states represent all possible combinations of three binary variables: Y, L, and their histories. "
-            "The height of each bar represents the long-run probability of being in that state."
+            "This visualization shows the stationary distribution of a Literal Automaton modeled as a Markov chain with 8 states. "
+            "Each state represents a combination of three binary variables: Y (stimulus), L (literal response), and Y_prev (previous stimulus). "
+            "The Markov chain captures the temporal dependencies and memory effects in the learning process."
+        ]),
+        html.P([
+            "The stationary distribution π is computed by finding the left eigenvector of the transition matrix P "
+            "corresponding to eigenvalue 1, satisfying π = πP. This represents the long-run probability distribution "
+            "over states as the system reaches equilibrium."
         ]),
         html.P([
             "Parameters:",
             html.Ul([
-                html.Li("s: Strength parameter affecting the learning dynamics"),
+                html.Li("s: Strength parameter affecting memory and state transitions"),
                 html.Li("P(L|Y): Probability of literal response given Y is true"),
-                html.Li("P(Y): Base probability that Y is true"),
+                html.Li("P(Y): Base probability that stimulus Y occurs"),
                 html.Li("P(L̄|Ȳ): Probability of not giving literal response when Y is false"),
-                html.Li("P(L̄|Y) = 1 - P(L|Y): Automatically calculated"),
-                html.Li("P(Ȳ) = 1 - P(Y): Automatically calculated")
+                html.Li("Transition probabilities depend on current state and parameter values"),
+                html.Li("States 1-6 typically represent 'forgotten' configurations with low stationary probability"),
+                html.Li("States 7-8 represent 'memorized' configurations with higher stationary probability")
             ])
         ])
     ], style={'marginTop': '30px', 'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'})
@@ -100,79 +106,84 @@ app.layout = html.Div([
 
 def calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     """
-    Calculate the stationary distribution for the 8-state Literal Automaton
-    States: (Y, L, Y_prev) where each can be 0 or 1
+    Calculate the stationary distribution for the 8-state Literal Automaton using Markov Chain theory.
+    
+    States represent combinations of (Y, L, Y_prev):
+    State 1: (0,0,0) - Y=False, L=False, Y_prev=False  
+    State 2: (0,0,1) - Y=False, L=False, Y_prev=True
+    State 3: (0,1,0) - Y=False, L=True, Y_prev=False
+    State 4: (0,1,1) - Y=False, L=True, Y_prev=True
+    State 5: (1,0,0) - Y=True, L=False, Y_prev=False
+    State 6: (1,0,1) - Y=True, L=False, Y_prev=True
+    State 7: (1,1,0) - Y=True, L=True, Y_prev=False
+    State 8: (1,1,1) - Y=True, L=True, Y_prev=True
     """
     # Derived probabilities
     p_l_bar_given_y = 1 - p_l_given_y
     p_y_bar = 1 - p_y
     p_l_given_y_bar = 1 - p_l_bar_given_y_bar
     
-    # Create transition matrix (8x8)
-    # States are ordered as: (0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)
-    # Where each tuple represents (Y, L, Y_prev)
+    # Create 8x8 transition matrix
+    P = np.zeros((8, 8))
     
-    transition_matrix = np.zeros((8, 8))
+    # For each current state, calculate transition probabilities to next states
+    # Next state depends on: new Y (random), new L (depends on new Y), Y_prev = current Y
     
-    # Define state transitions based on Literal Automaton dynamics
-    # This is a simplified model - you may need to adjust based on your specific assignment requirements
-    
-    for i in range(8):
-        # Decode current state
-        y_curr = i // 4
-        l_curr = (i // 2) % 2
-        y_prev = i % 2
+    for state in range(8):
+        # Decode current state (Y, L, Y_prev)
+        y_curr = (state // 4) % 2
+        l_curr = (state // 2) % 2  
+        y_prev_curr = state % 2
         
-        for j in range(8):
+        # For next step: Y_prev becomes current Y, and we sample new Y and L
+        for next_state in range(8):
             # Decode next state
-            y_next = j // 4
-            l_next = (j // 2) % 2
-            y_prev_next = j % 2
+            y_next = (next_state // 4) % 2
+            l_next = (next_state // 2) % 2
+            y_prev_next = next_state % 2
             
-            # Y_prev in next state should be Y_curr
-            if y_prev_next != y_curr:
-                continue
+            # Transition is valid only if Y_prev_next == Y_curr
+            if y_prev_next == y_curr:
+                # Probability of transitioning = P(Y_next) * P(L_next | Y_next)
+                prob_y_next = p_y if y_next == 1 else p_y_bar
                 
-            # Calculate transition probability
-            prob = 0.0
-            
-            # Probability of Y_next
-            if y_next == 1:
-                prob_y_next = p_y
-            else:
-                prob_y_next = p_y_bar
-            
-            # Probability of L_next given Y_next
-            if l_next == 1:
-                if y_next == 1:
-                    prob_l_next = p_l_given_y
-                else:
-                    prob_l_next = p_l_given_y_bar
-            else:
-                if y_next == 1:
-                    prob_l_next = p_l_bar_given_y
-                else:
-                    prob_l_next = p_l_bar_given_y_bar
-            
-            # Apply strength parameter (learning effect)
-            strength_factor = np.exp(s * (l_curr if y_curr == 1 else (1-l_curr)))
-            prob = prob_y_next * prob_l_next * strength_factor
-            
-            transition_matrix[i][j] = prob
+                if y_next == 1:  # Y is true
+                    prob_l_next = p_l_given_y if l_next == 1 else p_l_bar_given_y
+                else:  # Y is false  
+                    prob_l_next = p_l_given_y_bar if l_next == 1 else p_l_bar_given_y_bar
+                
+                # Apply strength parameter as memory effect
+                memory_factor = np.exp(-s * abs(l_curr - l_next))  # Higher s = more memory
+                prob_l_next *= memory_factor
+                
+                P[state, next_state] = prob_y_next * prob_l_next
     
-    # Normalize rows
+    # Normalize rows to ensure they sum to 1
     for i in range(8):
-        row_sum = np.sum(transition_matrix[i])
+        row_sum = np.sum(P[i, :])
         if row_sum > 0:
-            transition_matrix[i] = transition_matrix[i] / row_sum
+            P[i, :] /= row_sum
     
-    # Find stationary distribution (eigenvector with eigenvalue 1)
-    eigenvalues, eigenvectors = np.linalg.eig(transition_matrix.T)
-    stationary_idx = np.argmax(np.real(eigenvalues))
-    stationary_dist = np.real(eigenvectors[:, stationary_idx])
-    stationary_dist = stationary_dist / np.sum(stationary_dist)
-    
-    return np.abs(stationary_dist)
+    # Find stationary distribution by solving π = πP
+    # This is equivalent to finding the left eigenvector with eigenvalue 1
+    try:
+        eigenvalues, eigenvectors = np.linalg.eig(P.T)
+        
+        # Find the eigenvector corresponding to eigenvalue 1
+        stationary_idx = np.argmin(np.abs(eigenvalues - 1))
+        stationary_dist = np.real(eigenvectors[:, stationary_idx])
+        
+        # Ensure non-negative and normalize
+        stationary_dist = np.abs(stationary_dist)
+        stationary_dist = stationary_dist / np.sum(stationary_dist)
+        
+    except:
+        # Fallback: use iterative method
+        stationary_dist = np.ones(8) / 8  # Start with uniform distribution
+        for _ in range(1000):  # Iterate until convergence
+            stationary_dist = stationary_dist @ P
+        
+    return stationary_dist
 
 @app.callback(
     [Output('stationary-distribution-chart', 'figure'),
@@ -191,50 +202,61 @@ def update_chart(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     # Calculate stationary distribution
     stationary_dist = calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar)
     
-    # Create state labels
-    state_labels = [
-        "State 0: (Y=0, L=0, Y_prev=0)",
-        "State 1: (Y=0, L=0, Y_prev=1)", 
-        "State 2: (Y=0, L=1, Y_prev=0)",
-        "State 3: (Y=0, L=1, Y_prev=1)",
-        "State 4: (Y=1, L=0, Y_prev=0)",
-        "State 5: (Y=1, L=0, Y_prev=1)",
-        "State 6: (Y=1, L=1, Y_prev=0)",
-        "State 7: (Y=1, L=1, Y_prev=1)"
-    ]
+    # Create state labels (numbered 1-8 to match the image)
+    state_labels = [f"State {i+1}" for i in range(8)]
     
-    # Create the bar chart
+    # Create annotations for forgotten/memorized regions
+    annotations = []
+    # Add "Forgotten" annotation
+    annotations.append(dict(
+        x=2.5, y=max(stationary_dist[:6]) + 0.02,
+        text="Forgotten", showarrow=False,
+        font=dict(size=12, color="gray")
+    ))
+    # Add "Memorized" annotation  
+    annotations.append(dict(
+        x=6.5, y=max(stationary_dist[6:]) + 0.05,
+        text="Memorized", showarrow=False,
+        font=dict(size=12, color="gray")
+    ))
+    
+    # Create the bar chart with purple/blue colors to match the image
+    colors = ['lightblue'] * 6 + ['mediumpurple'] * 2  # Light blue for forgotten, purple for memorized
+    
     fig = go.Figure(data=[
         go.Bar(
-            x=list(range(8)),
+            x=list(range(1, 9)),  # States numbered 1-8
             y=stationary_dist,
-            text=[f"{prob:.3f}" for prob in stationary_dist],
-            textposition='auto',
-            marker_color='steelblue',
-            hovertemplate='<b>%{text}</b><br>' + 
-                         'State: %{x}<br>' + 
+            text=[f"{prob:.2f}" if prob > 0.05 else "" for prob in stationary_dist],
+            textposition='outside',
+            marker_color=colors,
+            hovertemplate='<b>State %{x}</b><br>' + 
                          'Probability: %{y:.4f}<extra></extra>'
         )
     ])
     
     fig.update_layout(
-        title='Stationary Distribution of 8-State Literal Automaton',
-        xaxis_title='State',
-        yaxis_title='Probability',
+        title='Interactive Stationary Distribution Chart',
+        xaxis_title='',
+        yaxis_title='',
         xaxis=dict(
             tickmode='array',
-            tickvals=list(range(8)),
-            ticktext=[f"S{i}" for i in range(8)]
+            tickvals=list(range(1, 9)),
+            ticktext=[str(i) for i in range(1, 9)]
         ),
-        height=500,
-        showlegend=False
+        yaxis=dict(range=[0, 1]),
+        height=400,
+        showlegend=False,
+        annotations=annotations,
+        plot_bgcolor='white',
+        paper_bgcolor='white'
     )
     
-    # Update derived parameters display
+    # Update derived parameters display to match the image format
     derived_params = html.Div([
-        html.P(f"P(L̄|Y) = 1 - P(L|Y) = {p_l_bar_given_y:.3f}"),
-        html.P(f"P(Ȳ) = 1 - P(Y) = {p_y_bar:.3f}"),
-        html.P(f"P(L|Ȳ) = 1 - P(L̄|Ȳ) = {p_l_given_y_bar:.3f}")
+        html.P(f"P(Y) = {p_y:.2f}", style={'margin': '2px 0'}),
+        html.P(f"P(L|Y) = {p_l_given_y:.1f}", style={'margin': '2px 0'}),
+        html.P(f"P(L|not Y) = {p_l_given_y_bar:.2f}", style={'margin': '2px 0'})
     ])
     
     return fig, derived_params
