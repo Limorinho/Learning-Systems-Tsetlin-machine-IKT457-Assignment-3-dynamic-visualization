@@ -10,33 +10,30 @@ import pandas as pd
 def calculate_stationary_distribution(s, p_l_given_y, p_y, p_not_l_given_not_y):
     """
     Calculate the stationary distribution for the 8-state Literal Automaton using the exact equations.
+    Based on the TypeScript implementation provided.
     """
     # Calculate derived probabilities
-    p_not_y = 1 - p_y  # P(Ȳ)
-    p_l_given_not_y = 1 - p_not_l_given_not_y  # P(L|Ȳ)
+    n_l_given_y = 1.0 - p_l_given_y  # P(~L|Y)
+    n_y = 1.0 - p_y  # P(~Y)
     
-    # Calculate the base expression (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))
-    base_expr = p_l_given_y * p_y + p_l_given_not_y * p_not_y
+    # Calculate the big equation: P(L|Y)*P(Y) + P(~L|~Y)*P(~Y)
+    big_eq = p_l_given_y * p_y + p_not_l_given_not_y * n_y
     
-    # Calculate each unnormalized probability according to the equations
-    pi_1_unnorm = (p_y**4) * (p_l_given_y**7)
-    pi_2_unnorm = (p_y**3) * (p_l_given_y**6) * s * base_expr
-    pi_3_unnorm = (p_y**2) * (p_l_given_y**5) * (s**2) * (base_expr**2)
-    pi_4_unnorm = p_y * (p_l_given_y**4) * (s**3) * (base_expr**3)
-    pi_5_unnorm = (p_l_given_y**3) * (s**4) * (base_expr**4)
-    pi_6_unnorm = (p_l_given_y**3) * (s**5) * base_expr
-    pi_7_unnorm = (p_l_given_y**3) * (s**6)
-    pi_8_unnorm = (p_l_given_y**3) * (s**7)
+    # Calculate each unnormalized probability according to the TypeScript formulas
+    pi_1 = (p_y**4) * (p_l_given_y**0) * (n_l_given_y**7) * (s**0) * (big_eq**0)
+    pi_2 = (p_y**3) * (p_l_given_y**0) * (n_l_given_y**6) * (s**1) * (big_eq**1)
+    pi_3 = (p_y**2) * (p_l_given_y**0) * (n_l_given_y**5) * (s**2) * (big_eq**2)
+    pi_4 = (p_y**1) * (p_l_given_y**0) * (n_l_given_y**4) * (s**3) * (big_eq**3)
+    pi_5 = (p_y**0) * (p_l_given_y**0) * (n_l_given_y**3) * (s**4) * (big_eq**4)
+    pi_6 = (p_y**0) * (p_l_given_y**1) * (n_l_given_y**2) * (s**5) * (big_eq**4)
+    pi_7 = (p_y**0) * (p_l_given_y**2) * (n_l_given_y**1) * (s**6) * (big_eq**4)
+    pi_8 = (p_y**0) * (p_l_given_y**3) * (n_l_given_y**0) * (s**7) * (big_eq**4)
     
-    # Calculate normalization constant α
-    total_unnorm = (pi_1_unnorm + pi_2_unnorm + pi_3_unnorm + pi_4_unnorm +
-                   pi_5_unnorm + pi_6_unnorm + pi_7_unnorm + pi_8_unnorm)
-    
-    alpha = 1.0 / total_unnorm if total_unnorm > 0 else 1.0
+    # Calculate normalization constant
+    total_unnorm = pi_1 + pi_2 + pi_3 + pi_4 + pi_5 + pi_6 + pi_7 + pi_8
     
     # Calculate normalized probabilities
-    distribution = alpha * np.array([pi_1_unnorm, pi_2_unnorm, pi_3_unnorm, pi_4_unnorm,
-                                    pi_5_unnorm, pi_6_unnorm, pi_7_unnorm, pi_8_unnorm])
+    distribution = np.array([pi_1, pi_2, pi_3, pi_4, pi_5, pi_6, pi_7, pi_8]) / total_unnorm
     
     return distribution
 
