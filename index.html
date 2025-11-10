@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Literal Automaton - Stationary Distribution Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        .slider-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .slider-item {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .slider-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .slider {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            background: #ddd;
+            outline: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+        .value-display {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .derived-params {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .derived-params h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .description {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 30px;
+        }
+        .description h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        #chart {
+            width: 100%;
+            height: 500px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Literal Automaton - Stationary Distribution Visualization</h1>
+        
+        <div class="slider-container">
+            <div class="slider-item">
+                <div class="slider-label">s (Strength parameter):</div>
+                <input type="range" min="1" max="25" value="5" step="0.1" class="slider" id="s-slider">
+                <div class="value-display" id="s-value">5.0</div>
+            </div>
+            
+            <div class="slider-item">
+                <div class="slider-label">P(L|Y) (Probability of L given Y):</div>
+                <input type="range" min="0" max="1" value="0.8" step="0.01" class="slider" id="p-l-given-y-slider">
+                <div class="value-display" id="p-l-given-y-value">0.80</div>
+            </div>
+            
+            <div class="slider-item">
+                <div class="slider-label">P(Y) (Probability of Y):</div>
+                <input type="range" min="0" max="1" value="0.6" step="0.01" class="slider" id="p-y-slider">
+                <div class="value-display" id="p-y-value">0.60</div>
+            </div>
+            
+            <div class="slider-item">
+                <div class="slider-label">P(~L|~Y) (Probability of not L given not Y):</div>
+                <input type="range" min="0" max="1" value="0.7" step="0.01" class="slider" id="p-not-l-given-not-y-slider">
+                <div class="value-display" id="p-not-l-given-not-y-value">0.70</div>
+            </div>
+        </div>
+        
+        <div class="derived-params">
+            <h3>Derived Parameters:</h3>
+            <div id="derived-params-content"></div>
+        </div>
+        
+        <div id="chart"></div>
+        
+        <div class="description">
+            <h3>Model Description:</h3>
+            <p>
+                This visualization shows the stationary distribution of a Literal Automaton with 8 states.
+                The eight states represent all possible combinations of three binary variables: Y, L, and their histories.
+                The height of each bar represents the long-run probability of being in that state.
+            </p>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+                <li><strong>s:</strong> Strength parameter affecting the learning dynamics</li>
+                <li><strong>P(L|Y):</strong> Probability of literal response given Y is true</li>
+                <li><strong>P(Y):</strong> Base probability that Y is true</li>
+                <li><strong>P(~L|~Y):</strong> Probability of not giving literal response when Y is false</li>
+                <li><strong>P(~L|Y) = 1 - P(L|Y):</strong> Automatically calculated</li>
+                <li><strong>P(~Y) = 1 - P(Y):</strong> Automatically calculated</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function calculateStationaryDistribution(s, pLGivenY, pY, pNotLGivenNotY) {
+            // Derived probabilities
+            const pNotLGivenY = 1 - pLGivenY;
+            const pNotY = 1 - pY;
+            const pLGivenNotY = 1 - pNotLGivenNotY;
+            
+            // Create transition matrix (8x8)
+            // States are ordered as: (0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)
+            // Where each tuple represents (Y, L, Y_prev)
+            
+            const transitionMatrix = Array(8).fill().map(() => Array(8).fill(0));
+            
+            // Define state transitions based on Literal Automaton dynamics
+            for (let i = 0; i < 8; i++) {
+                // Decode current state
+                const yCurr = Math.floor(i / 4);
+                const lCurr = Math.floor((i / 2)) % 2;
+                const yPrev = i % 2;
+                
+                for (let j = 0; j < 8; j++) {
+                    // Decode next state
+                    const yNext = Math.floor(j / 4);
+                    const lNext = Math.floor((j / 2)) % 2;
+                    const yPrevNext = j % 2;
+                    
+                    // Y_prev in next state should be Y_curr
+                    if (yPrevNext !== yCurr) continue;
+                    
+                    // Calculate transition probability
+                    let prob = 0.0;
+                    
+                    // Probability of Y_next
+                    const probYNext = yNext === 1 ? pY : pNotY;
+                    
+                    // Probability of L_next given Y_next
+                    let probLNext;
+                    if (lNext === 1) {
+                        probLNext = yNext === 1 ? pLGivenY : pLGivenNotY;
+                    } else {
+                        probLNext = yNext === 1 ? pNotLGivenY : pNotLGivenNotY;
+                    }
+                    
+                    // Apply strength parameter (learning effect)
+                    const strengthFactor = Math.exp(s * (yCurr === 1 ? lCurr : (1 - lCurr)));
+                    prob = probYNext * probLNext * strengthFactor;
+                    
+                    transitionMatrix[i][j] = prob;
+                }
+            }
+            
+            // Normalize rows
+            for (let i = 0; i < 8; i++) {
+                const rowSum = transitionMatrix[i].reduce((sum, val) => sum + val, 0);
+                if (rowSum > 0) {
+                    for (let j = 0; j < 8; j++) {
+                        transitionMatrix[i][j] = transitionMatrix[i][j] / rowSum;
+                    }
+                }
+            }
+            
+            // Find stationary distribution using power method (simplified)
+            let stationaryDist = Array(8).fill(1/8); // Start with uniform distribution
+            
+            // Iterate to find stationary distribution
+            for (let iter = 0; iter < 1000; iter++) {
+                const newDist = Array(8).fill(0);
+                for (let i = 0; i < 8; i++) {
+                    for (let j = 0; j < 8; j++) {
+                        newDist[j] += stationaryDist[i] * transitionMatrix[i][j];
+                    }
+                }
+                stationaryDist = newDist;
+            }
+            
+            // Normalize
+            const sum = stationaryDist.reduce((sum, val) => sum + val, 0);
+            return stationaryDist.map(val => Math.abs(val / sum));
+        }
+
+        function updateChart() {
+            const s = parseFloat(document.getElementById('s-slider').value);
+            const pLGivenY = parseFloat(document.getElementById('p-l-given-y-slider').value);
+            const pY = parseFloat(document.getElementById('p-y-slider').value);
+            const pNotLGivenNotY = parseFloat(document.getElementById('p-not-l-given-not-y-slider').value);
+            
+            // Update value displays
+            document.getElementById('s-value').textContent = s.toFixed(1);
+            document.getElementById('p-l-given-y-value').textContent = pLGivenY.toFixed(2);
+            document.getElementById('p-y-value').textContent = pY.toFixed(2);
+            document.getElementById('p-not-l-given-not-y-value').textContent = pNotLGivenNotY.toFixed(2);
+            
+            // Calculate derived parameters
+            const pNotLGivenY = 1 - pLGivenY;
+            const pNotY = 1 - pY;
+            const pLGivenNotY = 1 - pNotLGivenNotY;
+            
+            // Update derived parameters display
+            const derivedParamsContent = document.getElementById('derived-params-content');
+            derivedParamsContent.innerHTML = `
+                <p>P(~L|Y) = 1 - P(L|Y) = ${pNotLGivenY.toFixed(3)}</p>
+                <p>P(~Y) = 1 - P(Y) = ${pNotY.toFixed(3)}</p>
+                <p>P(L|~Y) = 1 - P(~L|~Y) = ${pLGivenNotY.toFixed(3)}</p>
+            `;
+            
+            // Calculate stationary distribution
+            const stationaryDist = calculateStationaryDistribution(s, pLGivenY, pY, pNotLGivenNotY);
+            
+            // Create state labels
+            const stateLabels = [
+                "State 0: (Y=0, L=0, Y_prev=0)",
+                "State 1: (Y=0, L=0, Y_prev=1)",
+                "State 2: (Y=0, L=1, Y_prev=0)",
+                "State 3: (Y=0, L=1, Y_prev=1)",
+                "State 4: (Y=1, L=0, Y_prev=0)",
+                "State 5: (Y=1, L=0, Y_prev=1)",
+                "State 6: (Y=1, L=1, Y_prev=0)",
+                "State 7: (Y=1, L=1, Y_prev=1)"
+            ];
+            
+            // Create the bar chart
+            const data = [{
+                x: [0, 1, 2, 3, 4, 5, 6, 7],
+                y: stationaryDist,
+                type: 'bar',
+                text: stationaryDist.map(prob => prob.toFixed(3)),
+                textposition: 'auto',
+                marker: {
+                    color: 'steelblue'
+                },
+                hovertemplate: '<b>%{text}</b><br>State: %{x}<br>Probability: %{y:.4f}<extra></extra>'
+            }];
+            
+            const layout = {
+                title: 'Stationary Distribution of 8-State Literal Automaton',
+                xaxis: {
+                    title: 'State',
+                    tickmode: 'array',
+                    tickvals: [0, 1, 2, 3, 4, 5, 6, 7],
+                    ticktext: ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']
+                },
+                yaxis: {
+                    title: 'Probability'
+                },
+                height: 500,
+                showlegend: false
+            };
+            
+            Plotly.newPlot('chart', data, layout);
+        }
+
+        // Add event listeners for sliders
+        document.getElementById('s-slider').addEventListener('input', updateChart);
+        document.getElementById('p-l-given-y-slider').addEventListener('input', updateChart);
+        document.getElementById('p-y-slider').addEventListener('input', updateChart);
+        document.getElementById('p-not-l-given-not-y-slider').addEventListener('input', updateChart);
+        
+        // Initial chart render
+        updateChart();
+    </script>
+</body>
+</html>
