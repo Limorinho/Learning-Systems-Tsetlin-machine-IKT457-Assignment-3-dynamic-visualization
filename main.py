@@ -106,83 +106,46 @@ app.layout = html.Div([
 
 def calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     """
-    Calculate the stationary distribution for the 8-state Literal Automaton using Markov Chain theory.
+    Calculate the stationary distribution for the 8-state Literal Automaton using the exact equations.
     
-    States represent combinations of (Y, L, Y_prev):
-    State 1: (0,0,0) - Y=False, L=False, Y_prev=False  
-    State 2: (0,0,1) - Y=False, L=False, Y_prev=True
-    State 3: (0,1,0) - Y=False, L=True, Y_prev=False
-    State 4: (0,1,1) - Y=False, L=True, Y_prev=True
-    State 5: (1,0,0) - Y=True, L=False, Y_prev=False
-    State 6: (1,0,1) - Y=True, L=False, Y_prev=True
-    State 7: (1,1,0) - Y=True, L=True, Y_prev=False
-    State 8: (1,1,1) - Y=True, L=True, Y_prev=True
+    From the assignment image, the equations are:
+    π₁ = α P(Y)⁴ P(L|Y)⁷
+    π₂ = α P(Y)³ P(L|Y)⁶ s (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))
+    π₃ = α P(Y)² P(L|Y)⁵ s² (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))²
+    π₄ = α P(Y) P(L|Y)⁴ s³ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))³
+    π₅ = α P(L|Y)³ s⁴ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))⁴
+    π₆ = α P(L|Y)³ s⁵ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))¹
+    π₇ = α P(L|Y)³ s⁶
+    π₈ = α P(L|Y)³ s⁷
     """
     # Derived probabilities
     p_l_bar_given_y = 1 - p_l_given_y
     p_y_bar = 1 - p_y
     p_l_given_y_bar = 1 - p_l_bar_given_y_bar
     
-    # Create 8x8 transition matrix
-    P = np.zeros((8, 8))
+    # Calculate the base expression (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))
+    base_expr = p_l_given_y * p_y + p_l_given_y_bar * p_y_bar
     
-    # For each current state, calculate transition probabilities to next states
-    # Next state depends on: new Y (random), new L (depends on new Y), Y_prev = current Y
+    # Calculate each unnormalized probability according to the exact equations
+    pi_1_unnorm = p_y**4 * p_l_given_y**7
+    pi_2_unnorm = p_y**3 * p_l_given_y**6 * s * base_expr
+    pi_3_unnorm = p_y**2 * p_l_given_y**5 * s**2 * base_expr**2
+    pi_4_unnorm = p_y * p_l_given_y**4 * s**3 * base_expr**3
+    pi_5_unnorm = p_l_given_y**3 * s**4 * base_expr**4
+    pi_6_unnorm = p_l_given_y**3 * s**5 * base_expr
+    pi_7_unnorm = p_l_given_y**3 * s**6
+    pi_8_unnorm = p_l_given_y**3 * s**7
     
-    for state in range(8):
-        # Decode current state (Y, L, Y_prev)
-        y_curr = (state // 4) % 2
-        l_curr = (state // 2) % 2  
-        y_prev_curr = state % 2
-        
-        # For next step: Y_prev becomes current Y, and we sample new Y and L
-        for next_state in range(8):
-            # Decode next state
-            y_next = (next_state // 4) % 2
-            l_next = (next_state // 2) % 2
-            y_prev_next = next_state % 2
-            
-            # Transition is valid only if Y_prev_next == Y_curr
-            if y_prev_next == y_curr:
-                # Probability of transitioning = P(Y_next) * P(L_next | Y_next)
-                prob_y_next = p_y if y_next == 1 else p_y_bar
-                
-                if y_next == 1:  # Y is true
-                    prob_l_next = p_l_given_y if l_next == 1 else p_l_bar_given_y
-                else:  # Y is false  
-                    prob_l_next = p_l_given_y_bar if l_next == 1 else p_l_bar_given_y_bar
-                
-                # Apply strength parameter as memory effect
-                memory_factor = np.exp(-s * abs(l_curr - l_next))  # Higher s = more memory
-                prob_l_next *= memory_factor
-                
-                P[state, next_state] = prob_y_next * prob_l_next
+    # Calculate normalization constant α
+    total_unnorm = (pi_1_unnorm + pi_2_unnorm + pi_3_unnorm + pi_4_unnorm +
+                   pi_5_unnorm + pi_6_unnorm + pi_7_unnorm + pi_8_unnorm)
     
-    # Normalize rows to ensure they sum to 1
-    for i in range(8):
-        row_sum = np.sum(P[i, :])
-        if row_sum > 0:
-            P[i, :] /= row_sum
+    alpha = 1.0 / total_unnorm if total_unnorm > 0 else 1.0
     
-    # Find stationary distribution by solving π = πP
-    # This is equivalent to finding the left eigenvector with eigenvalue 1
-    try:
-        eigenvalues, eigenvectors = np.linalg.eig(P.T)
-        
-        # Find the eigenvector corresponding to eigenvalue 1
-        stationary_idx = np.argmin(np.abs(eigenvalues - 1))
-        stationary_dist = np.real(eigenvectors[:, stationary_idx])
-        
-        # Ensure non-negative and normalize
-        stationary_dist = np.abs(stationary_dist)
-        stationary_dist = stationary_dist / np.sum(stationary_dist)
-        
-    except:
-        # Fallback: use iterative method
-        stationary_dist = np.ones(8) / 8  # Start with uniform distribution
-        for _ in range(1000):  # Iterate until convergence
-            stationary_dist = stationary_dist @ P
-        
+    # Calculate normalized probabilities
+    stationary_dist = alpha * np.array([pi_1_unnorm, pi_2_unnorm, pi_3_unnorm, pi_4_unnorm,
+                                       pi_5_unnorm, pi_6_unnorm, pi_7_unnorm, pi_8_unnorm])
+    
     return stationary_dist
 
 @app.callback(
