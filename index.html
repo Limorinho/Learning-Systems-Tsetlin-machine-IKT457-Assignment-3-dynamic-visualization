@@ -194,18 +194,41 @@
                     // Probability of Y_next
                     const probYNext = yNext === 1 ? pY : pNotY;
                     
-                    // Probability of L_next given Y_next
-                    let probLNext;
+                    // Base probability of L_next given Y_next
+                    let baseProbLNext;
                     if (lNext === 1) {
-                        probLNext = yNext === 1 ? pLGivenY : pLGivenNotY;
+                        baseProbLNext = yNext === 1 ? pLGivenY : pLGivenNotY;
                     } else {
-                        probLNext = yNext === 1 ? pNotLGivenY : pNotLGivenNotY;
+                        baseProbLNext = yNext === 1 ? pNotLGivenY : pNotLGivenNotY;
                     }
                     
-                    // Apply strength parameter (learning effect)
-                    const strengthFactor = Math.exp(s * (yCurr === 1 ? lCurr : (1 - lCurr)));
-                    prob = probYNext * probLNext * strengthFactor;
+                    // Apply strength parameter (learning effect based on consistency)
+                    // Higher s means stronger bias towards consistent behavior
+                    let strengthAdjustment = 1.0;
                     
+                    if (yNext === 1) {
+                        // When Y is true, bias towards L=1 (literal response)
+                        if (lNext === 1) {
+                            strengthAdjustment = 1 + (s - 1) * 0.1; // Increase probability
+                        } else {
+                            strengthAdjustment = 1 / (1 + (s - 1) * 0.1); // Decrease probability
+                        }
+                    } else {
+                        // When Y is false, bias towards L=0 (non-literal response)
+                        if (lNext === 0) {
+                            strengthAdjustment = 1 + (s - 1) * 0.1; // Increase probability
+                        } else {
+                            strengthAdjustment = 1 / (1 + (s - 1) * 0.1); // Decrease probability
+                        }
+                    }
+                    
+                    // Apply learning effect based on previous experience
+                    if (yPrev === yCurr && lCurr === (yCurr === 1 ? 1 : 0)) {
+                        // If previous behavior was consistent, strengthen the pattern
+                        strengthAdjustment *= (1 + (s - 1) * 0.05);
+                    }
+                    
+                    prob = probYNext * baseProbLNext * strengthAdjustment;
                     transitionMatrix[i][j] = prob;
                 }
             }
