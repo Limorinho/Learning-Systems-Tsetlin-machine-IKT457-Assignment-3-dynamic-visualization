@@ -104,37 +104,62 @@ app.layout = html.Div([
     ], style={'marginTop': '30px', 'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'})
 ])
 
+def pi_1(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₁ = α * y⁴ * l_given_y⁰ * n_l_given_y⁷ * s⁰ * big_eq⁰"""
+    return alpha * (y ** 4) * (l_given_y ** 0) * (n_l_given_y ** 7) * (s ** 0) * (big_eq ** 0)
+
+def pi_2(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₂ = α * y³ * l_given_y⁰ * n_l_given_y⁶ * s¹ * big_eq¹"""
+    return alpha * (y ** 3) * (l_given_y ** 0) * (n_l_given_y ** 6) * (s ** 1) * (big_eq ** 1)
+
+def pi_3(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₃ = α * y² * l_given_y⁰ * n_l_given_y⁵ * s² * big_eq²"""
+    return alpha * (y ** 2) * (l_given_y ** 0) * (n_l_given_y ** 5) * (s ** 2) * (big_eq ** 2)
+
+def pi_4(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₄ = α * y¹ * l_given_y⁰ * n_l_given_y⁴ * s³ * big_eq³"""
+    return alpha * (y ** 1) * (l_given_y ** 0) * (n_l_given_y ** 4) * (s ** 3) * (big_eq ** 3)
+
+def pi_5(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₅ = α * y⁰ * l_given_y⁰ * n_l_given_y³ * s⁴ * big_eq⁴"""
+    return alpha * (y ** 0) * (l_given_y ** 0) * (n_l_given_y ** 3) * (s ** 4) * (big_eq ** 4)
+
+def pi_6(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₆ = α * y⁰ * l_given_y¹ * n_l_given_y² * s⁵ * big_eq⁴"""
+    return alpha * (y ** 0) * (l_given_y ** 1) * (n_l_given_y ** 2) * (s ** 5) * (big_eq ** 4)
+
+def pi_7(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₇ = α * y⁰ * l_given_y² * n_l_given_y¹ * s⁶ * big_eq⁴"""
+    return alpha * (y ** 0) * (l_given_y ** 2) * (n_l_given_y ** 1) * (s ** 6) * (big_eq ** 4)
+
+def pi_8(alpha, y, l_given_y, n_l_given_y, s, big_eq):
+    """π₈ = α * y⁰ * l_given_y³ * n_l_given_y⁰ * s⁷ * big_eq⁴"""
+    return alpha * (y ** 0) * (l_given_y ** 3) * (n_l_given_y ** 0) * (s ** 7) * (big_eq ** 4)
+
 def calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     """
-    Calculate the stationary distribution for the 8-state Literal Automaton using the exact equations.
-    
-    From the assignment image, the equations are:
-    π₁ = α P(Y)⁴ P(L|Y)⁷
-    π₂ = α P(Y)³ P(L|Y)⁶ s (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))
-    π₃ = α P(Y)² P(L|Y)⁵ s² (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))²
-    π₄ = α P(Y) P(L|Y)⁴ s³ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))³
-    π₅ = α P(L|Y)³ s⁴ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))⁴
-    π₆ = α P(L|Y)³ s⁵ (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))¹
-    π₇ = α P(L|Y)³ s⁶
-    π₈ = α P(L|Y)³ s⁷
+    Calculate the stationary distribution for the 8-state Literal Automaton 
+    using the TypeScript implementation formula pattern.
     """
-    # Derived probabilities
-    p_l_bar_given_y = 1 - p_l_given_y
-    p_y_bar = 1 - p_y
-    p_l_given_y_bar = 1 - p_l_bar_given_y_bar
+    # Variable naming to match TypeScript
+    y = p_y
+    l_given_y = p_l_given_y
+    n_l_given_n_y = p_l_bar_given_y_bar
     
-    # Calculate the base expression (P(L|Y)P(Y) + P(L|Ȳ)P(Ȳ))
-    base_expr = p_l_given_y * p_y + p_l_given_y_bar * p_y_bar
+    # Derived probabilities (matching TypeScript)
+    n_l_given_y = 1.0 - l_given_y
+    n_y = 1.0 - y
+    big_eq = l_given_y * y + n_l_given_n_y * n_y
     
-    # Calculate each unnormalized probability according to the exact equations
-    pi_1_unnorm = p_y**4 * p_l_given_y**7
-    pi_2_unnorm = p_y**3 * p_l_given_y**6 * s * base_expr
-    pi_3_unnorm = p_y**2 * p_l_given_y**5 * s**2 * base_expr**2
-    pi_4_unnorm = p_y * p_l_given_y**4 * s**3 * base_expr**3
-    pi_5_unnorm = p_l_given_y**3 * s**4 * base_expr**4
-    pi_6_unnorm = p_l_given_y**3 * s**5 * base_expr
-    pi_7_unnorm = p_l_given_y**3 * s**6
-    pi_8_unnorm = p_l_given_y**3 * s**7
+    # Calculate each unnormalized probability using TypeScript pattern
+    pi_1_unnorm = pi_1(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_2_unnorm = pi_2(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_3_unnorm = pi_3(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_4_unnorm = pi_4(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_5_unnorm = pi_5(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_6_unnorm = pi_6(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_7_unnorm = pi_7(1, y, l_given_y, n_l_given_y, s, big_eq)
+    pi_8_unnorm = pi_8(1, y, l_given_y, n_l_given_y, s, big_eq)
     
     # Calculate normalization constant α
     total_unnorm = (pi_1_unnorm + pi_2_unnorm + pi_3_unnorm + pi_4_unnorm +
@@ -143,8 +168,16 @@ def calculate_stationary_distribution(s, p_l_given_y, p_y, p_l_bar_given_y_bar):
     alpha = 1.0 / total_unnorm if total_unnorm > 0 else 1.0
     
     # Calculate normalized probabilities
-    stationary_dist = alpha * np.array([pi_1_unnorm, pi_2_unnorm, pi_3_unnorm, pi_4_unnorm,
-                                       pi_5_unnorm, pi_6_unnorm, pi_7_unnorm, pi_8_unnorm])
+    stationary_dist = np.array([
+        pi_1(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_2(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_3(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_4(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_5(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_6(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_7(alpha, y, l_given_y, n_l_given_y, s, big_eq),
+        pi_8(alpha, y, l_given_y, n_l_given_y, s, big_eq)
+    ])
     
     return stationary_dist
 
