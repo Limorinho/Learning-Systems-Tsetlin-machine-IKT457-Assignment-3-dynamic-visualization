@@ -161,105 +161,30 @@
 
     <script>
         function calculateStationaryDistribution(s, pLGivenY, pY, pNotLGivenNotY) {
-            // Derived probabilities
-            const pNotLGivenY = 1 - pLGivenY;
-            const pNotY = 1 - pY;
-            const pLGivenNotY = 1 - pNotLGivenNotY;
+            // Calculate derived probabilities
+            const nLGivenY = 1.0 - pLGivenY;  // P(~L|Y)
+            const nY = 1.0 - pY;  // P(~Y)
             
-            // Create transition matrix (8x8)
-            // States are ordered as: (0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)
-            // Where each tuple represents (Y, L, Y_prev)
+            // Calculate the big equation: P(L|Y)*P(Y) + P(~L|~Y)*P(~Y)
+            const bigEq = pLGivenY * pY + pNotLGivenNotY * nY;
             
-            const transitionMatrix = Array(8).fill().map(() => Array(8).fill(0));
+            // Calculate each unnormalized probability according to the exact equations from the assignment
+            const pi1 = Math.pow(pY, 4) * Math.pow(pLGivenY, 0) * Math.pow(nLGivenY, 7) * Math.pow(s, 0) * Math.pow(bigEq, 0);
+            const pi2 = Math.pow(pY, 3) * Math.pow(pLGivenY, 0) * Math.pow(nLGivenY, 6) * Math.pow(s, 1) * Math.pow(bigEq, 1);
+            const pi3 = Math.pow(pY, 2) * Math.pow(pLGivenY, 0) * Math.pow(nLGivenY, 5) * Math.pow(s, 2) * Math.pow(bigEq, 2);
+            const pi4 = Math.pow(pY, 1) * Math.pow(pLGivenY, 0) * Math.pow(nLGivenY, 4) * Math.pow(s, 3) * Math.pow(bigEq, 3);
+            const pi5 = Math.pow(pY, 0) * Math.pow(pLGivenY, 0) * Math.pow(nLGivenY, 3) * Math.pow(s, 4) * Math.pow(bigEq, 4);
+            const pi6 = Math.pow(pY, 0) * Math.pow(pLGivenY, 1) * Math.pow(nLGivenY, 2) * Math.pow(s, 5) * Math.pow(bigEq, 4);
+            const pi7 = Math.pow(pY, 0) * Math.pow(pLGivenY, 2) * Math.pow(nLGivenY, 1) * Math.pow(s, 6) * Math.pow(bigEq, 4);
+            const pi8 = Math.pow(pY, 0) * Math.pow(pLGivenY, 3) * Math.pow(nLGivenY, 0) * Math.pow(s, 7) * Math.pow(bigEq, 4);
             
-            // Define state transitions based on Literal Automaton dynamics
-            for (let i = 0; i < 8; i++) {
-                // Decode current state
-                const yCurr = Math.floor(i / 4);
-                const lCurr = Math.floor((i / 2)) % 2;
-                const yPrev = i % 2;
-                
-                for (let j = 0; j < 8; j++) {
-                    // Decode next state
-                    const yNext = Math.floor(j / 4);
-                    const lNext = Math.floor((j / 2)) % 2;
-                    const yPrevNext = j % 2;
-                    
-                    // Y_prev in next state should be Y_curr
-                    if (yPrevNext !== yCurr) continue;
-                    
-                    // Calculate transition probability
-                    let prob = 0.0;
-                    
-                    // Probability of Y_next
-                    const probYNext = yNext === 1 ? pY : pNotY;
-                    
-                    // Base probability of L_next given Y_next
-                    let baseProbLNext;
-                    if (lNext === 1) {
-                        baseProbLNext = yNext === 1 ? pLGivenY : pLGivenNotY;
-                    } else {
-                        baseProbLNext = yNext === 1 ? pNotLGivenY : pNotLGivenNotY;
-                    }
-                    
-                    // Apply strength parameter (learning effect based on consistency)
-                    // Higher s means stronger bias towards consistent behavior
-                    let strengthAdjustment = 1.0;
-                    
-                    if (yNext === 1) {
-                        // When Y is true, bias towards L=1 (literal response)
-                        if (lNext === 1) {
-                            strengthAdjustment = 1 + (s - 1) * 0.1; // Increase probability
-                        } else {
-                            strengthAdjustment = 1 / (1 + (s - 1) * 0.1); // Decrease probability
-                        }
-                    } else {
-                        // When Y is false, bias towards L=0 (non-literal response)
-                        if (lNext === 0) {
-                            strengthAdjustment = 1 + (s - 1) * 0.1; // Increase probability
-                        } else {
-                            strengthAdjustment = 1 / (1 + (s - 1) * 0.1); // Decrease probability
-                        }
-                    }
-                    
-                    // Apply learning effect based on previous experience
-                    if (yPrev === yCurr && lCurr === (yCurr === 1 ? 1 : 0)) {
-                        // If previous behavior was consistent, strengthen the pattern
-                        strengthAdjustment *= (1 + (s - 1) * 0.05);
-                    }
-                    
-                    prob = probYNext * baseProbLNext * strengthAdjustment;
-                    transitionMatrix[i][j] = prob;
-                }
-            }
+            // Calculate normalization constant
+            const totalUnnorm = pi1 + pi2 + pi3 + pi4 + pi5 + pi6 + pi7 + pi8;
             
-            // Normalize rows
-            for (let i = 0; i < 8; i++) {
-                const rowSum = transitionMatrix[i].reduce((sum, val) => sum + val, 0);
-                if (rowSum > 0) {
-                    for (let j = 0; j < 8; j++) {
-                        transitionMatrix[i][j] = transitionMatrix[i][j] / rowSum;
-                    }
-                }
-            }
+            // Calculate normalized probabilities
+            const distribution = [pi1, pi2, pi3, pi4, pi5, pi6, pi7, pi8].map(pi => pi / totalUnnorm);
             
-            // Find stationary distribution using power method (simplified)
-            let stationaryDist = Array(8).fill(1/8); // Start with uniform distribution
-            
-            // Iterate to find stationary distribution
-            for (let iter = 0; iter < 1000; iter++) {
-                const newDist = Array(8).fill(0);
-                for (let i = 0; i < 8; i++) {
-                    for (let j = 0; j < 8; j++) {
-                        newDist[j] += stationaryDist[i] * transitionMatrix[i][j];
-                    }
-                }
-                stationaryDist = newDist;
-            }
-            
-            // Normalize
-            const sum = stationaryDist.reduce((sum, val) => sum + val, 0);
-            return stationaryDist.map(val => Math.abs(val / sum));
+            return distribution;
         }
 
         function updateChart() {
@@ -278,56 +203,84 @@
             const pNotLGivenY = 1 - pLGivenY;
             const pNotY = 1 - pY;
             const pLGivenNotY = 1 - pNotLGivenNotY;
+            const baseExpr = pLGivenY * pY + pLGivenNotY * pNotY;
             
             // Update derived parameters display
             const derivedParamsContent = document.getElementById('derived-params-content');
             derivedParamsContent.innerHTML = `
-                <p>P(~L|Y) = 1 - P(L|Y) = ${pNotLGivenY.toFixed(3)}</p>
-                <p>P(~Y) = 1 - P(Y) = ${pNotY.toFixed(3)}</p>
-                <p>P(L|~Y) = 1 - P(~L|~Y) = ${pLGivenNotY.toFixed(3)}</p>
+                <p style="margin: 2px 0;">P(~L|Y) = 1 - P(L|Y) = ${pNotLGivenY.toFixed(3)}</p>
+                <p style="margin: 2px 0;">P(~Y) = 1 - P(Y) = ${pNotY.toFixed(3)}</p>
+                <p style="margin: 2px 0;">P(L|~Y) = 1 - P(~L|~Y) = ${pLGivenNotY.toFixed(3)}</p>
+                <p style="margin: 2px 0;">Base expression = P(L|Y)P(Y) + P(L|~Y)P(~Y) = ${baseExpr.toFixed(3)}</p>
             `;
             
-            // Calculate stationary distribution
+            // Calculate stationary distribution using exact equations
             const stationaryDist = calculateStationaryDistribution(s, pLGivenY, pY, pNotLGivenNotY);
             
-            // Create state labels
-            const stateLabels = [
-                "State 0: (Y=0, L=0, Y_prev=0)",
-                "State 1: (Y=0, L=0, Y_prev=1)",
-                "State 2: (Y=0, L=1, Y_prev=0)",
-                "State 3: (Y=0, L=1, Y_prev=1)",
-                "State 4: (Y=1, L=0, Y_prev=0)",
-                "State 5: (Y=1, L=0, Y_prev=1)",
-                "State 6: (Y=1, L=1, Y_prev=0)",
-                "State 7: (Y=1, L=1, Y_prev=1)"
-            ];
+            // Create colors for forgotten vs memorized states
+            const colors = ['lightblue', 'lightblue', 'lightblue', 'lightblue', 
+                           'mediumpurple', 'mediumpurple', 'mediumpurple', 'mediumpurple'];
             
             // Create the bar chart
             const data = [{
-                x: [0, 1, 2, 3, 4, 5, 6, 7],
+                x: [1, 2, 3, 4, 5, 6, 7, 8],
                 y: stationaryDist,
                 type: 'bar',
                 text: stationaryDist.map(prob => prob.toFixed(4)),
-                textposition: 'auto',
+                textposition: 'outside',
                 marker: {
-                    color: 'steelblue'
+                    color: colors
                 },
-                hovertemplate: '<b>%{text}</b><br>State: %{x}<br>Probability: %{y:.4f}<extra></extra>'
+                hovertemplate: '<b>π%{x}</b><br>Probability: %{y:.6f}<extra></extra>'
             }];
             
             const layout = {
-                title: 'Stationary Distribution of 8-State Literal Automaton',
+                title: 'Interactive Stationary Distribution Chart',
                 xaxis: {
-                    title: 'State',
+                    title: '',
                     tickmode: 'array',
-                    tickvals: [0, 1, 2, 3, 4, 5, 6, 7],
-                    ticktext: ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']
+                    tickvals: [1, 2, 3, 4, 5, 6, 7, 8],
+                    ticktext: ['1', '2', '3', '4', '5', '6', '7', '8']
                 },
                 yaxis: {
-                    title: 'Probability'
+                    title: 'π',
+                    range: [0, Math.max(...stationaryDist) * 1.3]
                 },
                 height: 500,
-                showlegend: false
+                showlegend: false,
+                annotations: [
+                    {
+                        x: 2.5,
+                        y: Math.max(...stationaryDist.slice(0, 4)) + Math.max(...stationaryDist) * 0.1,
+                        text: "Forgotten",
+                        showarrow: false,
+                        font: {size: 14, color: "gray"}
+                    },
+                    {
+                        x: 6.5,
+                        y: Math.max(...stationaryDist.slice(4, 8)) + Math.max(...stationaryDist) * 0.1,
+                        text: "Memorized",
+                        showarrow: false,
+                        font: {size: 14, color: "gray"}
+                    }
+                ],
+                shapes: [
+                    {
+                        type: 'line',
+                        x0: 4.5,
+                        y0: 0,
+                        x1: 4.5,
+                        y1: Math.max(...stationaryDist) * 1.3,
+                        line: {
+                            color: 'gray',
+                            width: 2,
+                            dash: 'dash'
+                        },
+                        opacity: 0.5
+                    }
+                ],
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white'
             };
             
             Plotly.newPlot('chart', data, layout);
@@ -344,3 +297,4 @@
     </script>
 </body>
 </html>
+``` 
